@@ -60,8 +60,9 @@ static struct
 	GtkWidget *find_in_files;
 	GtkWidget *expand_all;
 	GtkWidget *collapse_all;
+	GtkWidget *new;
 }
-doc_items = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+doc_items = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 enum
 {
@@ -73,7 +74,8 @@ enum
 {
 	OPENFILES_ACTION_REMOVE = 0,
 	OPENFILES_ACTION_SAVE,
-	OPENFILES_ACTION_RELOAD
+	OPENFILES_ACTION_RELOAD,
+	OPENFILES_ACTION_NEW
 };
 
 /* documents tree model columns */
@@ -706,6 +708,13 @@ static void create_openfiles_popup_menu(void)
 	item = gtk_separator_menu_item_new();
 	gtk_widget_show(item);
 	gtk_container_add(GTK_CONTAINER(openfiles_popup_menu), item);
+	
+	item = gtk_image_menu_item_new_from_stock(GTK_STOCK_NEW, NULL);
+	gtk_widget_show(item);
+	gtk_container_add(GTK_CONTAINER(openfiles_popup_menu), item);
+	g_signal_connect(item, "activate",
+			G_CALLBACK(on_openfiles_document_action), GINT_TO_POINTER(OPENFILES_ACTION_NEW));
+	doc_items.new = item;
 
 	item = gtk_image_menu_item_new_from_stock(GTK_STOCK_SAVE, NULL);
 	gtk_widget_show(item);
@@ -824,6 +833,15 @@ static void document_action(GeanyDocument *doc, gint action)
 			document_save_file(doc, FALSE);
 			break;
 		}
+		case OPENFILES_ACTION_NEW:
+		{
+			gchar *dir = g_path_get_dirname(doc->real_path);
+			gchar *path = g_strconcat(dir, "/", GEANY_STRING_UNTITLED, NULL);
+			document_new_file(path, NULL, NULL);
+			g_free(path);
+			g_free(dir);
+			break;
+		}
 		case OPENFILES_ACTION_RELOAD:
 		{
 			document_reload_prompt(doc, NULL);
@@ -853,6 +871,10 @@ static void on_openfiles_document_action(GtkMenuItem *menuitem, gpointer user_da
 			/* parent item selected */
 			GtkTreeIter child;
 			gint i = gtk_tree_model_iter_n_children(model, &iter) - 1;
+			
+			/* This should only run once */
+			if(action == OPENFILES_ACTION_NEW)
+				i = 0;
 
 			while (i >= 0 && gtk_tree_model_iter_nth_child(model, &child, &iter, i))
 			{
@@ -1055,6 +1077,7 @@ static void documents_menu_update(GtkTreeSelection *selection)
 
 	/* can close all, save all (except shortname), but only reload individually ATM */
 	gtk_widget_set_sensitive(doc_items.close, sel);
+	gtk_widget_set_sensitive(doc_items.new, !(doc && doc->real_path));
 	gtk_widget_set_sensitive(doc_items.save, (doc && doc->real_path) || path);
 	gtk_widget_set_sensitive(doc_items.reload, doc && doc->real_path);
 	gtk_widget_set_sensitive(doc_items.find_in_files, sel);
